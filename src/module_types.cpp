@@ -189,6 +189,7 @@
 #include "core/services/AudioService.h"
 #include "core/services/PictureService.h"
 #include "core/services/OscService.h"
+#include "core/services/ShowClockService.h"
 #include "core/system/I2cBusModule.h"
 #include "core/system/TasksModule.h"
 #include "core/system/PinsModule.h"
@@ -386,6 +387,7 @@ void mm::registerModuleTypes() {
     mm::ModuleFactory::registerType<mm::AudioService>("AudioService", "core/services.md#audio");
     mm::ModuleFactory::registerType<mm::PictureService>("PictureService", "core/services.md#picture");
     mm::ModuleFactory::registerType<mm::OscService>("OscService", "core/services.md#osc");
+    mm::ModuleFactory::registerType<mm::ShowClockService>("ShowClockService", "core/services.md#showclock");
     mm::ModuleFactory::registerType<mm::I2cBusModule>("I2cBusModule", "core/system.md#i2c-bus");
     mm::ModuleFactory::registerType<mm::TasksModule>("TasksModule", "core/system.md#tasks");
     mm::ModuleFactory::registerType<mm::PinsModule>("PinsModule", "core/system.md#pins");

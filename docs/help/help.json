@@ -1263,6 +1263,10 @@
      "text": "A zlib-compressed FSEQ (xLights/FPP's default) plays only on ESP32 boards; desktop and Teensy builds show a clean error instead of playing it.\n\nZstd-compressed files do not play on any target yet.\n\nExport a track uncompressed if it needs to play everywhere."
     },
     {
+     "title": "Playing in step with other boards",
+     "text": "With `follow` on, the player plays the scene ShowClockService names, from the playlist file of that name, at the frame due now. Boards following one reference show the same moment, each from its own file. A late board picks up mid-scene; one without the file goes dark."
+    },
+    {
      "title": "The layout numbers its lights as the xLights model does",
      "text": "A frame holds one value per light in the order xLights numbers the model, which is the order the outputs drive them. Give the layout the same order, on a strip, a panel or a cube, and each light shows what the show sent it."
     }
@@ -1286,6 +1290,9 @@
     },
     "shuffle": {
      "line": "Picks the next track at random instead of in playlist order."
+    },
+    "follow": {
+     "line": "play the show clock's scene, not the transport"
     },
     "loopMode": {
      "line": "At a track's end: stop, repeat it, or repeat the playlist."
@@ -4603,6 +4610,36 @@
    "doc": "core/services.md#osc",
    "source": "https://github.com/MoonModules/MoonLight/blob/main/src/core/services/OscService.h",
    "tests": "https://moonmodules.org/MoonLight/reference/tests.html#oscservice"
+  },
+  "ShowClockService": {
+   "line": "Keeps this device's clock in step with a reference, and follows the scene the reference plays, so boards apart render as one show.",
+   "summary": "Every effect animates from the layer's clock, and this service moves that clock onto the reference's time. Two boards following one reference then draw a time-based effect the same way at the same moment, and an FSEQ player following the scene shows the same frame on each.",
+   "guide": [
+    {
+     "title": "Following a reference",
+     "text": "Turn on `listen` and name the reference by address: a show computer running `moondeck/run/show_clock.py`, or another MoonLight board. The status shows the offset and the round trip once it answers."
+    },
+    {
+     "title": "Being a reference",
+     "text": "With `listen` on and no reference named, the device answers others' clock requests on its own time."
+    }
+   ],
+   "controls": {
+    "listen": {
+     "line": "Answer and send clock messages, which an unauthenticated port carries."
+    },
+    "port": {
+     "line": "The UDP port both ends use."
+    },
+    "reference": {
+     "line": "The reference's address; empty answers others and follows no one."
+    }
+   },
+   "role": "service",
+   "dim": 0,
+   "doc": "core/services.md#showclock",
+   "source": "https://github.com/MoonModules/MoonLight/blob/main/src/core/services/ShowClockService.h",
+   "tests": "https://moonmodules.org/MoonLight/reference/tests.html#showclockservice"
   },
   "I2cBusModule": {
    "line": "The board's I2C bus: its two pins, opened once and shared by every device on it, with a scan that detects them.",

@@ -9,6 +9,7 @@
 #include "light/modifiers/ModifierBase.h"
 #include "light/powerfunctions/draw.h"        // draw::fade, the collected once-per-frame fade
 #include "light/powerfunctions/particles.h"   // particles::FrameTime, the elapsed-to-scale conversion
+#include "core/util/SyncedClock.h"           // synced::millis, the clock every effect animates from
 #include "platform/platform.h"
 
 #include <cstdio>
@@ -148,7 +149,7 @@ public:
     /// Apply the frame's fade, then tick each enabled effect into the layer's buffer.
     void tick() MM_NONBLOCKING override {
         // Gated per child here because the layer iterates its own children, not through the Scheduler.
-        elapsed_ = platform::millis();
+        elapsed_ = synced::millis();   // the device's own time, or a reference's once ShowClockService follows one
         // Advance on every frame: a frozen clock spends a whole idle gap at once and wipes the trail.
         const uint32_t frameScale = fadeTime_.advance(elapsed_);
         fadeDue_ = fadeDue_ + frameScale < 2 * particles::FrameTime::kOne ? fadeDue_ + frameScale : 2 * particles::FrameTime::kOne;   // bounded: the carry, not this, holds how much

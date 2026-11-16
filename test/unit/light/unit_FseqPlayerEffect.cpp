@@ -781,3 +781,45 @@ TEST_CASE("deleting and moving playlist rows keeps each row's own path") {
     CHECK(path(0) == "/sd/b.fseq");
     CHECK(path(1) == "/sd/a.fseq");
 }
+
+TEST_CASE("follow plays the scene the show clock names, at the frame its start time says is due") {
+    SdFixture sd;
+    sd.writeFseq("/sd/intro.fseq", makeFseqV1Bytes(/*channelCount=*/48, /*frameCount=*/10));   // 25 ms a frame
+    Scene s;
+    auto& e = s.effect;
+    e.setup();
+    e.prepare();
+    uint32_t id = 0;
+    REQUIRE(e.addListRow(id));
+    e.setFollowForTest(true);
+    s.layer.tick();   // the layer's clock, which the effect reads
+    const uint32_t now = s.layer.elapsed();
+
+    synced::setScene("intro", now - 60);   // 60 ms in: frame 2 is due
+    e.tick20ms();
+    e.tick();
+    REQUIRE(e.stateForTest() == FseqPlayerEffect::PlayState::Playing);
+    std::vector<uint8_t> buf(48);
+    e.copyWiringFrame(buf.data(), buf.size(), /*force=*/true);
+    for (uint8_t b : buf) CHECK(b == 2);
+
+    synced::setScene("intro", now);   // started again: rewinds to frame 0
+    e.tick20ms();
+    e.tick();
+    e.copyWiringFrame(buf.data(), buf.size(), true);
+    for (uint8_t b : buf) CHECK(b == 0);
+
+    synced::setScene("outro", now);   // no file for it: dark, and says so
+    e.tick20ms();
+    CHECK(e.stateForTest() == FseqPlayerEffect::PlayState::Stopped);
+    REQUIRE(e.status() != nullptr);
+    CHECK(std::string(e.status()) == "no file for this scene");
+    synced::setScene("", 0);
+}
+
+TEST_CASE("A scene matches a playlist file by its base name, ignoring folder and extension") {
+    CHECK(FseqPlayerEffect::namesScene("/sd/shows/Ice Palace.fseq", "Ice Palace"));
+    CHECK(FseqPlayerEffect::namesScene("intro", "intro"));
+    CHECK_FALSE(FseqPlayerEffect::namesScene("/sd/intro2.fseq", "intro"));
+    CHECK_FALSE(FseqPlayerEffect::namesScene("/sd/intro.fseq", "intr"));
+}
