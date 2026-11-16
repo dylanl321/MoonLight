@@ -45,6 +45,7 @@
 #include "light/layouts/SingleRowLayout.h"
 #include "light/layouts/SingleColumnLayout.h"
 #include "light/layouts/PanelLayout.h"
+#include "light/layouts/PointsLayout.h"
 #include "light/layouts/CubeLayout.h"
 #include "light/layouts/TubesLayout.h"
 #include "light/layouts/RingLayout.h"
@@ -240,6 +241,7 @@ void mm::registerModuleTypes() {
     mm::ModuleFactory::registerType<mm::GridLayout>("GridLayout", "light/layouts.md#grid");
     mm::ModuleFactory::registerType<mm::GridBlacksLayout>("GridBlacksLayout", "light/layouts.md#gridblacks");
     mm::ModuleFactory::registerType<mm::PanelLayout>("PanelLayout", "light/layouts.md#panel");
+    mm::ModuleFactory::registerType<mm::PointsLayout>("PointsLayout", "light/layouts.md#points");
     mm::ModuleFactory::registerType<mm::RingLayout>("RingLayout", "light/layouts.md#ring");
     mm::ModuleFactory::registerType<mm::Rings241Layout>("Rings241Layout", "light/layouts.md#rings241");
     mm::ModuleFactory::registerType<mm::SingleColumnLayout>("SingleColumnLayout", "light/layouts.md#singlecolumn");

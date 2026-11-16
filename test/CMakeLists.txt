@@ -242,6 +242,7 @@ add_executable(mm_tests
     unit/light/unit_WaveEffect.cpp
     unit/light/unit_FireEffect.cpp
     unit/light/unit_GridLayout.cpp
+    unit/light/unit_PointsLayout.cpp
     unit/light/unit_Rings241Layout.cpp
     unit/light/unit_SingleColumnLayout.cpp
     unit/light/unit_SphereLayout.cpp
