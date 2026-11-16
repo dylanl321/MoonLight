@@ -507,6 +507,35 @@
    "doc": "light/layouts.md#panel",
    "source": "https://github.com/MoonModules/MoonLight/blob/main/src/light/layouts/PanelLayout.h"
   },
+  "PointsLayout": {
+   "line": "Lights at positions read from a file: any shape, measured or exported from another tool.",
+   "summary": "The other layouts compute where the lights are from a few numbers. This one is for lights whose positions are already known: a house outline traced in a design tool, a tree measured by hand, a prop exported from a sequencer. Each line of the file is one light in wiring order, so the file is also the wiring.",
+   "guide": [
+    {
+     "title": "The file",
+     "text": "A plain text file in the `/layouts` folder, one light per line in wiring order: `x,y,z`, whole numbers from 0 to 32767. The unit is the file's choice, and it sets the grid the effects draw on, so a coarser unit means a smaller buffer."
+    },
+    {
+     "title": "Gaps and comments",
+     "text": "A fourth field of `0` keeps that light dark, for a wired pixel that should never light. Lines starting with `#` and blank lines are skipped, and a malformed line is skipped and counted in the status. Two lights may share a position and then show the same color, which suits a bulb wired as two pixels."
+    },
+    {
+     "title": "Making a file",
+     "text": "Any tool that can write numbers can make one. `moondeck/run/xlights_points.py` writes one per controller from an xLights layout, in the controller's own channel order."
+    }
+   ],
+   "controls": {
+    "file": {
+     "line": "The file the lights are read from."
+    }
+   },
+   "role": "layout",
+   "tags": "💫",
+   "dim": 3,
+   "doc": "light/layouts.md#points",
+   "source": "https://github.com/MoonModules/MoonLight/blob/main/src/light/layouts/PointsLayout.h",
+   "tests": "https://moonmodules.org/MoonLight/reference/tests.html#pointslayout"
+  },
   "RingLayout": {
    "line": "A ring of lights evenly spaced around a circle, or an arc of one.",
    "summary": "The lights start at `angleFirst` and span `rotation` degrees, a full turn drawing the whole circle. A center of its own places the ring anywhere, which is how CarLights and Rings241 build their lamps and discs from rings.",
