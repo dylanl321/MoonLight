@@ -7,6 +7,7 @@
 #include "platform/platform.h"       // fsReadStreamXxx, fsList, zlibInflateAll
 #include "core/util/JsonSink.h"      // the playlist's own ListSource serialization
 #include "core/util/JsonUtil.h"      // restoreList: recursive reader for the persisted playlist
+#include "core/util/SyncedClock.h"   // the scene a show clock says is playing, for `follow`
 
 #include <cstdio>
 #include <cstdlib>   // qsort: the picker's file order
@@ -30,6 +31,10 @@ namespace mm {
 /// Zstd-compressed files do not play on any target yet.
 ///
 /// Export a track uncompressed if it needs to play everywhere.
+///
+/// ## Playing in step with other boards
+///
+/// With `follow` on, the player plays the scene ShowClockService names, from the playlist file of that name, at the frame due now. Boards following one reference show the same moment, each from its own file. A late board picks up mid-scene; one without the file goes dark.
 ///
 /// ## The layout numbers its lights as the xLights model does
 ///
@@ -63,6 +68,8 @@ public:
         controls_.addButton("next");
         /// Picks the next track at random instead of in playlist order.
         controls_.addControl("shuffle", shuffle_);
+        /// Plays the scene the show clock names, in step with the reference, instead of the transport.
+        controls_.addControl("follow", follow_);
         /// At a track's end: stop, repeat it, or repeat the playlist.
         controls_.addSelect("loopMode", loopMode_, kLoopModeOptions, 3);
         controls_.addSelect("fpsSource", fpsSource_, kFpsSourceOptions, 2);
@@ -108,9 +115,11 @@ public:
 
     /// Render last tick's decoded frame, then decode the next due one: the blocking read lives here, never in `tick()`, at most one frame per call.
     void tick20ms() MM_NONBLOCKING override {
+        if (follow_) { followScene(); return; }
         if (state_ != PlayState::Playing) return;
         const uint32_t now = elapsed();
         const uint32_t stepMs = effectiveStepMs();
+        if (now - lastFrameMs_ > kRebaseMs) lastFrameMs_ = now - stepMs;   // the clock jumped, as a first sync steps it: one frame, not a race to catch up
         if (now - lastFrameMs_ < stepMs) return;
         lastFrameMs_ += stepMs;   // advance by one step, not to `now`: a stall catches up one frame at a time
         if (aheadFrameReady_) { writeFrameToSink(); aheadFrameReady_ = false; }
@@ -131,6 +140,7 @@ public:
     void onControlChanged(const char* controlName) override {
         if (controlName) {
             if (std::strcmp(controlName, "fpsSource") == 0) rebuildControls();
+            if (std::strcmp(controlName, "follow") == 0) followVersion_ = kNoVersion;   // act on the scene standing now
             for (const auto& row : kButtonHandlers) {
                 if (std::strcmp(controlName, row.name) == 0) { (this->*row.handler)(); break; }
             }
@@ -297,6 +307,24 @@ public:
     uint32_t effectiveStepMsForTest() const { return effectiveStepMs(); }
     /// Run one tick20ms decode step without waiting out the real frame cadence.
     void decodeOneFrameForTest() { lastFrameMs_ = elapsed() - effectiveStepMs(); tick20ms(); }
+    /// The playlist row whose file is named `scene`, ignoring its folder and extension, or -1.
+    int rowForScene(const char* scene) const {
+        if (!scene || !scene[0]) return -1;
+        for (uint8_t i = 0; i < playlistCount_; i++)
+            if (namesScene(trackFile(i), scene)) return i;
+        return -1;
+    }
+    /// Whether `path` is the file for `scene`: its base name, before the last dot, equal to it.
+    static bool namesScene(const char* path, const char* scene) {
+        const char* slash = std::strrchr(path, '/');
+        const char* base = slash ? slash + 1 : path;
+        const char* dot = std::strrchr(base, '.');
+        const size_t len = dot ? static_cast<size_t>(dot - base) : std::strlen(base);
+        return std::strlen(scene) == len && std::strncmp(base, scene, len) == 0;
+    }
+    /// Turn following on or off, as the control does.
+    void setFollowForTest(bool f) { follow_ = f; followVersion_ = kNoVersion; }
+
     /// Test seam for the scan's directory-join, the one piece of the scan desktop can exercise directly.
     static bool joinPathForTest(const char* dir, const char* name, char* out, size_t outCap) {
         return joinPath(dir, name, out, outCap);
@@ -313,6 +341,12 @@ private:
     static constexpr uint8_t kMaxFps = 50;
     /// The slowest step the decode cadence can honor: 1000 / kMaxFps, so a file-sourced rate above it clamps here.
     static constexpr uint32_t kMinStepMs = 1000u / kMaxFps;
+    /// A gap past this is a clock jump or a long stall, not frames owed.
+    static constexpr uint32_t kRebaseMs = 1000;
+    /// The most frames one follow tick decodes to catch up; four a tick is 200 a second, past any show's rate.
+    static constexpr uint8_t kMaxCatchUp = 4;
+    /// A scene version never seen, so turning `follow` on acts on whatever scene stands.
+    static constexpr uint32_t kNoVersion = 0xFFFFFFFFu;
     /// A ceiling against a corrupt block-length field: real exports ran up to ~300KB/block, so 4MB keeps headroom.
     static constexpr size_t kMaxCompressedBlockBytes = 4 * 1024 * 1024;
 
@@ -327,6 +361,8 @@ private:
     uint8_t  cursor_ = 0;
 
     bool     shuffle_ = false;
+    bool     follow_ = false;           ///< play the show clock's scene, not the transport
+    uint32_t followVersion_ = kNoVersion;   ///< the scene version last acted on; none, so the first follow tick acts
     uint8_t  loopMode_ = kLoopAll;
     uint8_t  fpsSource_ = kFpsFromFile;   ///< where the rate comes from: the file's step time, or fps_
     uint8_t  fps_ = 30;   ///< the manual playback rate; 1000/fps milliseconds per frame
@@ -810,6 +846,42 @@ private:
             if (a != b) return false;
         }
         return true;
+    }
+
+    /// Follow the show clock: load the scene's row when the scene changes, then decode up to the frame its start time says is due.
+    void followScene() {
+        const synced::Scene& sc = synced::scene();
+        if (sc.version != followVersion_) {
+            followVersion_ = sc.version;
+            startScene(sc.name);
+        }
+        if (state_ != PlayState::Playing) return;
+        const synced::Position p = synced::positionAt(elapsed(), sc.startMs, effectiveStepMs(), header_.frameCount);
+        if (!p.started || p.ended) return;   // before the start, or past the end: hold what is shown
+        if (frameIndex_ > p.frame + 1 && !loadTrack(cursor_)) return;   // ahead, as a clock stepped back leaves it: rewind
+        bool fresh = false;
+        for (uint8_t budget = kMaxCatchUp; frameIndex_ <= p.frame && budget > 0; budget--) {
+            if (!decodeCurrentFrame()) return;
+            frameIndex_++;
+            fresh = true;
+        }
+        if (fresh) { writeFrameToSink(); aheadFrameReady_ = false; }
+    }
+
+    /// Load the row for `name` from its first frame, or stop and go dark when there is none.
+    void startScene(const char* name) {
+        const int row = rowForScene(name);
+        if (row < 0) {
+            closeTrackStream();
+            state_ = PlayState::Stopped;
+            frameIndex_ = 0;
+            writeBlackFrame();
+            if (name[0]) setStatus("no file for this scene", Severity::Warning);
+            else setStatus("following: no scene");
+            return;
+        }
+        state_ = PlayState::Playing;
+        loadTrack(static_cast<uint8_t>(row));
     }
 
     /// Show the transport state, the current file, and its position in the playlist.

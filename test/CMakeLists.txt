@@ -243,6 +243,9 @@ add_executable(mm_tests
     unit/light/unit_FireEffect.cpp
     unit/light/unit_GridLayout.cpp
     unit/light/unit_PointsLayout.cpp
+    unit/core/unit_ClockPacket.cpp
+    unit/core/unit_SyncedClock.cpp
+    unit/core/unit_ShowClockService.cpp
     unit/light/unit_Rings241Layout.cpp
     unit/light/unit_SingleColumnLayout.cpp
     unit/light/unit_SphereLayout.cpp
