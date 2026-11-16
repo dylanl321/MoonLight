@@ -29,7 +29,13 @@ inline constexpr const char* kPick[3] = {kDir, kExt, kTemplate};
 
 /// One parsed light: its position, and whether it is a dark slot.
 struct Point {
-    lengthType x, y, z;
+    /// Across.
+    lengthType x;
+    /// Down.
+    lengthType y;
+    /// Into the scene.
+    lengthType z;
+    /// A wired slot that never lights.
     bool dark;
 };
 
@@ -40,8 +46,11 @@ using PointFn = void (*)(void* ctx, const Point& p);
 
 /// What a parse found: lights accepted, and lines refused as malformed.
 struct ParseResult {
+    /// Lines read as lights.
     uint32_t lights = 0;
+    /// Lines refused as malformed.
     uint32_t skipped = 0;
+    /// Whether the read itself failed.
     bool readError = false;
 };
 
@@ -70,8 +79,7 @@ inline bool toPoint(const long (&v)[4], Point& p) {
     return true;
 }
 
-/// Parse one line, already stripped of its end of line, into `p`; false for a line that is not a light.
-/// A light is three or four whole numbers separated by commas, spaces, tabs or semicolons. Coordinates run 0 to 32767, the range `lengthType` holds, and a fourth field of 0 marks the light dark.
+/// Parse one line into `p`: three or four whole numbers, coordinates 0 to 32767 and a fourth field of 0 for dark; false for anything else.
 inline bool parseLine(const char* line, Point& p) {
     long v[4] = {0, 0, 0, 1};
     long extra = 0;   // a fifth field lands here, only to be counted
@@ -84,7 +92,9 @@ inline bool parseLine(const char* line, Point& p) {
 
 /// One line of a file, gathered a character at a time and judged when it ends.
 struct LineReader {
+    /// The line so far.
     char line[80];
+    /// How much of it is filled.
     size_t len = 0;
     bool overflow = false;   ///< longer than the buffer, so refused whole rather than split
 
@@ -117,8 +127,7 @@ private:
     }
 };
 
-/// Stream a point file through `read`, calling `onPoint` per light, up to `limit` lights.
-/// It holds one line at a time, so memory stays fixed whatever the file's size. A line longer than the buffer is refused as malformed rather than split.
+/// Stream a point file through `read`, one line held at a time, calling `onPoint` per light up to `limit`; a line past the buffer is refused, not split.
 inline ParseResult parse(ReadFn read, void* readCtx, PointFn onPoint, void* pointCtx,
                          uint32_t limit = 0xFFFFFFFFu) {
     ParseResult r;
